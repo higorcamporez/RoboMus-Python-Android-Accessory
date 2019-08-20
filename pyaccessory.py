@@ -14,6 +14,9 @@ import sys
 import time
 import random
 import array
+import csv
+from thread import start_new_thread
+
 
 VID_ANDROID_ACCESSORY = 0x22B8   
 PID_ANDROID_ACCESSORY = 0x2E82
@@ -121,52 +124,29 @@ def sensor_output(lsensor, variation):
     return output
 
 
-def communication_loop(ldev):
+def communication_loop(ldev, times_read):
     """Accessory client to device communication loop"""
-    #sensor = 50
-    while True:
-        
-        # random sensor variation
-        #toss = random.randint(-10, 10)
-        #sensor = sensor_output(sensor, sensor_variation(toss))
-        '''
-        # write to device
-        msg = "S{:04}".format(sensor)
-        print ("<<< {}".format(msg))
+    print("loopsss")
+    t = time.time()
+    while (time.time() - t < 30):
+        # read from device 
         try:
-            #ret = ldev.write(0x02, msg, 150)
-            assert ret == len(msg)
+            ret = ldev.read(0x81,1, 150)
+            if len(ret) > 0:
+                times_read.append(time.time())
+                print(time.time())
+
         except usb.core.USBError as e:
+            
             if e.errno == 19:
+                print(e)
                 break
             if e.errno == 110:
-                # the application has been stopped
-                break
-            print(e)
-        '''
-        # read from device
-        for d in ldev: 
-            try:
-                ret = d.read(0x81,1, 150)
-                sret = ''.join([chr(x) for x in ret])
-                print(">>> {}".format(sret))
-                '''
-                ret = ldev[1].read(0x81,1, 150)
-                sret = ''.join([chr(x) for x in ret])
-                print("1>>> {}".format(sret))
-                '''
-            except usb.core.USBError as e:
-                
-                if e.errno == 19:
-                    print("deu ruim,brother")
-                    print(e)
-                    break
-                if e.errno == 110:
-                    # a timeout is OK, no message has been sent
-                    pass
-                else:
-                    print(e)
-        time.sleep(0.2)
+                # a timeout is OK, no message has been sent
+                pass
+            else:
+                print(e)
+        #time.sleep(0.2)
     return
 
 
@@ -193,26 +173,27 @@ def main():
     
     if not adev:
         print("deu ruim")
+        return
         
     for d in adev:
         print("d.address=")
         print(d.address)
-   
-    communication_loop(adev)
         
-    '''
-    while True:
-        ddev = get_android_dev()
-        if not ddev:
-            continue
-        adev = get_accessory_dev(ddev)
-        time.sleep(1);
-        if not adev:
-            continue
-        print("Will now communicate with device")
-        communication_loop(adev)
-        break
-    '''
+    times_read1 = list();
+    times_read2 = list();
+    start_new_thread(communication_loop,(adev[0],times_read1))
+    start_new_thread(communication_loop,(adev[1],times_read2))
+
+    time.sleep(40)
+    print(times_read1);
+    print(times_read2);
+
+    c1 = csv.writer(open("times_read1.csv", "wb"))
+    c1.writerow(times_read1)
+
+    c2 = csv.writer(open("times_read2.csv", "wb"))
+    c2.writerow(times_read2)
+  
 
 if __name__ == '__main__':
     main()
