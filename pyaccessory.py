@@ -5,11 +5,14 @@
 # distribution and at
 # https://github.com/Arn-O/py-android-accessory/blob/master/LICENSE.
 
+#adaptação do código original descrito acima
+
 """
 Simple Android Accessory client in Python.
 """
 
 import usb.core
+import usb.util
 import sys
 import time
 import random
@@ -20,6 +23,9 @@ from thread import start_new_thread
 
 VID_ANDROID_ACCESSORY = 0x22B8   
 PID_ANDROID_ACCESSORY = 0x2E82
+
+#VID_ANDROID_ACCESSORY = 0x18d1   
+#PID_ANDROID_ACCESSORY = 0x4ee7
 
 
 def get_accessory_dev(ldev):
@@ -78,14 +84,16 @@ def set_protocol(ldev):
 
 def set_strings(ldev):
     """Send series of strings to activate accessory mode"""
-    send_string(ldev, 0, 'aang')
-    send_string(ldev, 1, 'AndroidAccessory')
+    send_string(ldev, 0, 'RoboMus')
+    send_string(ldev, 1, 'blink')
+    #send_string(ldev, 0, 'aang')
+    #send_string(ldev, 1, 'AndroidAccessory')
     send_string(ldev, 2, 'A Python based Android accessory')
     send_string(ldev, 3, '1.0')
     send_string(
         ldev,
         4,
-        'https://github.com/Arn-O/py-android-accessory/'
+        'https://github.com/higorcamporez/RoboMus-Python-Android-Accessory'
     )
     return
 
@@ -126,15 +134,16 @@ def sensor_output(lsensor, variation):
 
 def communication_loop(ldev, times_read):
     """Accessory client to device communication loop"""
-    print("loopsss")
+    #print("loopsss")
     t = time.time()
-    while (time.time() - t < 30):
+    while True:
         # read from device 
         try:
-            ret = ldev.read(0x81,1, 150)
+            ret = ldev.read(0x81,1, 1500)
             if len(ret) > 0:
-                times_read.append(time.time())
-                print(time.time())
+                
+                times_read.append([ret[0],time.time()])
+                #print("ret ",ret[0]," t ",time.time())
 
         except usb.core.USBError as e:
             
@@ -161,38 +170,55 @@ def main():
                                 )
                     )
 
-    print devices[0].bus, devices[0].address
-    print devices[1].bus, devices[1].address
+    if not devices:
+        print(len(devices))
+        print("1deu ruim, brother")
+        devices = tuple(usb.core.find(
+            find_all=True,
+            idVendor=0x18d1, 
+            idProduct=0x2d00
+        ))
+        #return
+    
+    #print devices[0].bus, devices[0].address
+    #print devices[1].bus, devices[1].address
     
     adev = get_accessory_dev(devices)
+    
     adev = tuple(usb.core.find(
         find_all=True,
         idVendor=0x18d1, 
         idProduct=0x2d00
     ))
-    
+    '''
+    adev = tuple(usb.core.find(
+        find_all=True,
+        idVendor=0x18d1, 
+        idProduct=0x2d00
+    ))
+    '''
     if not adev:
-        print("deu ruim")
+        print(len(adev))
+        print("2deu ruim, brother")
         return
-        
+    
+    times_read = list();    
+
     for d in adev:
         print("d.address=")
         print(d.address)
-        
-    times_read1 = list();
-    times_read2 = list();
-    start_new_thread(communication_loop,(adev[0],times_read1))
-    start_new_thread(communication_loop,(adev[1],times_read2))
+        times_read.append(list())
 
-    time.sleep(40)
-    print(times_read1);
-    print(times_read2);
+    for i in range(len(adev)):
+        start_new_thread(communication_loop,(adev[i],times_read[i]))
 
-    c1 = csv.writer(open("times_read1.csv", "wb"))
-    c1.writerow(times_read1)
+    raw_input("Aperte Qualquer Tecla para Encerrar")
 
-    c2 = csv.writer(open("times_read2.csv", "wb"))
-    c2.writerow(times_read2)
+    for i in range(len(times_read)):
+        c = csv.writer(open("times_read"+str(i)+".csv", "wb"))
+        c.writerow([usb.util.get_string(adev[i], adev[i].iProduct)])
+        for j in range(len(times_read[i])):
+            c.writerow(times_read[i][j])
   
 
 if __name__ == '__main__':
